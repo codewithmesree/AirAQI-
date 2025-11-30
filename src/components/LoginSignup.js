@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 import './LoginSignup.css';
 
 const LoginSignup = () => {
   const navigate = useNavigate();
+  const { signup, login, googleSignIn } = useAuth();
   const [activeTab, setActiveTab] = useState('login');
   const [formData, setFormData] = useState({
     email: '',
@@ -13,6 +14,7 @@ const LoginSignup = () => {
     name: ''
   });
   const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleInputChange = (e) => {
     setFormData({
@@ -24,47 +26,46 @@ const LoginSignup = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
+    setLoading(true);
 
     try {
       if (activeTab === 'login') {
-        const response = await axios.post('/api/login', {
-          email: formData.email,
-          password: formData.password
-        });
-        
+        await login(formData.email, formData.password);
         setMessage('Login successful!');
-        console.log('User logged in:', response.data.user);
-        // Redirect to dashboard after successful login
-        setTimeout(() => {
-          navigate('/dashboard');
-        }, 1000);
-        
+        navigate('/dashboard');
       } else {
-        // Signup validation
         if (formData.password !== formData.confirmPassword) {
           setMessage('Passwords do not match');
+          setLoading(false);
           return;
         }
-        if (!formData.name || !formData.email || !formData.password) {
+        if (!formData.email || !formData.password) {
           setMessage('Please fill in all fields');
+          setLoading(false);
           return;
         }
-        
-        const response = await axios.post('/api/signup', {
-          email: formData.email,
-          password: formData.password,
-          name: formData.name
-        });
-        
+
+        await signup(formData.email, formData.password);
         setMessage('Signup successful!');
-        console.log('User created:', response.data.user);
+        navigate('/dashboard');
       }
     } catch (error) {
-      if (error.response) {
-        setMessage(error.response.data.error || 'An error occurred');
-      } else {
-        setMessage('Network error. Please check if the backend is running.');
-      }
+      console.error("Auth Error:", error);
+      setMessage(error.message.replace('Firebase: ', ''));
+    }
+    setLoading(false);
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setMessage('');
+      setLoading(true);
+      await googleSignIn();
+      navigate('/dashboard');
+    } catch (error) {
+      console.error("Google Auth Error:", error);
+      setMessage(error.message.replace('Firebase: ', ''));
+      setLoading(false);
     }
   };
 
@@ -113,7 +114,7 @@ const LoginSignup = () => {
               />
             </div>
           )}
-          
+
           <div className="input-group">
             <input
               type="email"
@@ -151,12 +152,14 @@ const LoginSignup = () => {
 
           {activeTab === 'login' && (
             <div className="forgot-password">
-              <a href="#" className="forgot-link">Forgot Password?</a>
+              <button type="button" className="forgot-link" onClick={() => setMessage('Forgot password functionality not implemented')}>
+                Forgot Password?
+              </button>
             </div>
           )}
 
-          <button type="submit" className="submit-btn">
-            {activeTab === 'login' ? 'Log in' : 'Sign up'}
+          <button type="submit" className="submit-btn" disabled={loading}>
+            {loading ? 'Processing...' : (activeTab === 'login' ? 'Log in' : 'Sign up')}
           </button>
 
           {message && (
@@ -172,7 +175,7 @@ const LoginSignup = () => {
         </div>
 
         {/* Google login */}
-        <button className="google-btn">
+        <button type="button" className="google-btn" onClick={handleGoogleSignIn} disabled={loading}>
           <div className="google-icon">G</div>
           <span>Continue with Google</span>
         </button>

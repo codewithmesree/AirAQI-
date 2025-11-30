@@ -122,6 +122,11 @@
   text-decoration: none;
   font-size: 14px;
   font-weight: 500;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
 }
 
 .forgot-link:hover {

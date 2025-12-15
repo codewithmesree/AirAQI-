@@ -1,0 +1,12 @@
+(psycopg2.errors.InsufficientPrivilege) permission denied for schema public
+LINE 2: CREATE TABLE users (
+                     ^
+
+[SQL: -- USERS (Firebase references only)
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    firebase_uid VARCHAR(255) UNIQUE NOT NULL,
+    email VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)]
+(Background on this error at: https://sqlalche.me/e/20/f405)

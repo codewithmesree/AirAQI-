@@ -23,6 +23,7 @@ db.init_app(app)
 # Common pattern: app.py initializes db, models.py imports db.
 # app.py imports models.
 from models import User, Location, AirQualityReading, Report
+from aqi_service import fetch_and_store_aqi
 
 @app.route('/api/health', methods=['GET'])
 def health():
@@ -122,6 +123,11 @@ def get_readings():
     
     readings = query.order_by(AirQualityReading.recorded_at.desc()).limit(limit).all()
     return jsonify([r.to_dict() for r in readings]), 200
+
+@app.route('/api/aqi/fetch-external', methods=['POST'])
+def trigger_aqi_fetch():
+    result, status_code = fetch_and_store_aqi()
+    return jsonify(result), status_code
 
 # --- LOCATION ROUTES ---
 @app.route('/api/locations', methods=['POST'])

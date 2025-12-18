@@ -1,8 +1,44 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import Sidebar from './Sidebar';
 import './Dashboard.css';
 
 const Dashboard = () => {
+  const [aqiData, setAqiData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Assuming location_id=1 is "Delhi" or the default location for now
+        const response = await axios.get('/api/readings?location_id=1&limit=1');
+        if (response.data && response.data.length > 0) {
+          setAqiData(response.data[0]);
+        }
+      } catch (error) {
+        console.error("Error fetching AQI data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Helper to determine status based on AQI (simple logic for now)
+  const getStatus = (aqi) => {
+    if (aqi <= 50) return 'Good';
+    if (aqi <= 100) return 'Moderate';
+    if (aqi <= 150) return 'Unhealthy for Sensitive Groups';
+    if (aqi <= 200) return 'Unhealthy';
+    if (aqi <= 300) return 'Very Unhealthy';
+    return 'Hazardous';
+  };
+
+  const getStatusClass = (status) => {
+    return status.toLowerCase().replace(/ /g, '-');
+  };
+
   return (
     <div className="dashboard">
       <Sidebar />
@@ -25,12 +61,15 @@ const Dashboard = () => {
                 <div className="aqi-metrics">
                   <div className="metric-box">
                     <p className="metric-label">Current AQI</p>
-                    <p className="metric-value primary">285</p>
-                    <p className="metric-status unhealthy">Unhealthy</p>
+                    <p className="metric-value primary">{loading ? '...' : (aqiData ? aqiData.aqi : '--')}</p>
+                    <p className={`metric-status ${loading ? '' : (aqiData ? getStatusClass(getStatus(aqiData.aqi)) : '')}`}>
+                      {loading ? 'Loading...' : (aqiData ? getStatus(aqiData.aqi) : 'No Data')}
+                    </p>
                   </div>
                   <div className="metric-box">
                     <p className="metric-label">Dominant Pollutant</p>
                     <p className="metric-value">PM2.5</p>
+                    <p className="metric-sub-value">{loading ? '' : (aqiData ? `${aqiData.pm2_5} µg/m³` : '')}</p>
                   </div>
                 </div>
 

@@ -1,17 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 import Sidebar from './Sidebar';
 import './Reports.css';
 
 const Reports = () => {
+    const { currentUser } = useAuth();
     const [reportType, setReportType] = useState('daily');
+    const [reports, setReports] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-    const reportsData = [
-        { id: 1, name: 'Daily Air Quality Summary', date: 'Nov 28, 2025', type: 'PDF', status: 'Ready' },
-        { id: 2, name: 'Weekly Pollution Analysis', date: 'Nov 24, 2025', type: 'CSV', status: 'Ready' },
-        { id: 3, name: 'Monthly Source Breakdown', date: 'Nov 01, 2025', type: 'PDF', status: 'Ready' },
-        { id: 4, name: 'Health Impact Assessment', date: 'Oct 15, 2025', type: 'PDF', status: 'Archived' },
-        { id: 5, name: 'Quarterly Forecast Accuracy', date: 'Oct 01, 2025', type: 'CSV', status: 'Ready' },
-    ];
+    const fetchReports = async () => {
+        if (!currentUser) return;
+        try {
+            const response = await axios.get(`/api/reports?firebase_uid=${currentUser.uid}`);
+            setReports(response.data);
+        } catch (error) {
+            console.error("Error fetching reports:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchReports();
+    }, [currentUser]);
+
+    const handleCreateReport = async () => {
+        if (!currentUser) return;
+        try {
+            // Logic to create a report
+            // For now, we'll create a dummy report based on the form 
+            // In a real app, this would probably trigger a backend job
+            const newReport = {
+                firebase_uid: currentUser.uid,
+                name: `${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report`,
+                type: 'PDF', // Hardcoded for simplified example
+                status: 'Processing',
+                file_url: 'http://example.com/pending'
+            };
+
+            await axios.post('/api/reports', newReport);
+            alert("Report generation started!");
+            fetchReports(); // Refresh list
+        } catch (error) {
+            console.error("Error creating report:", error);
+            alert("Failed to create report");
+        }
+    };
 
     return (
         <div className="dashboard">
@@ -48,7 +84,7 @@ const Reports = () => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {reportsData.map((report) => (
+                                        {reports.map((report) => (
                                             <tr key={report.id}>
                                                 <td className="report-name-cell">
                                                     <div className="file-icon">
@@ -58,7 +94,7 @@ const Reports = () => {
                                                     </div>
                                                     {report.name}
                                                 </td>
-                                                <td>{report.date}</td>
+                                                <td>{new Date(report.generated_date || report.created_at).toLocaleDateString()}</td>
                                                 <td><span className={`badge ${report.type.toLowerCase()}`}>{report.type}</span></td>
                                                 <td><span className={`status-dot ${report.status.toLowerCase()}`}></span> {report.status}</td>
                                                 <td>
@@ -116,7 +152,7 @@ const Reports = () => {
                                         </label>
                                     </div>
                                 </div>
-                                <button type="button" className="generate-submit-btn">
+                                <button type="button" className="generate-submit-btn" onClick={handleCreateReport}>
                                     Create Report
                                 </button>
                             </form>

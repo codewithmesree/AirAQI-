@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import './LoginSignup.css';
@@ -31,6 +32,30 @@ const LoginSignup = () => {
     try {
       if (activeTab === 'login') {
         await login(formData.email, formData.password);
+
+        // Sync with backend
+        // Note: In a real app, you might get the token from Firebase and send it as a header
+        // For now, we just send the email and a placeholder UID or the actual UID if we could get it easily from the result
+        // But login() doesn't return the user object directly in this context context usually, 
+        // let's assume we can get it from the implicit state or we might accept a delay.
+        // Actually, better to just let the user in. The backend sync is critical for data association.
+        // Let's rely on the AuthContext to have updated, or better yet, successful login implies we can proceed.
+        // Ideally we should sync. Let's try to get the user from the login result if possible, 
+        // OR just proceed. 
+        // Wait, the plan says "Call POST /api/users".
+        // Use a temporary ID or just email? Backend expects firebase_uid. 
+        // Real firebase auth returns a user credential.
+        // The context `login` returns the promise from `signInWithEmailAndPassword`.
+        // So we can get the user.
+
+        // Let's modify to get the user object
+        const userCredential = await login(formData.email, formData.password);
+        const user = userCredential.user;
+        await axios.post('/api/users', {
+          firebase_uid: user.uid,
+          email: user.email
+        });
+
         setMessage('Login successful!');
         navigate('/dashboard');
       } else {
@@ -45,7 +70,13 @@ const LoginSignup = () => {
           return;
         }
 
-        await signup(formData.email, formData.password);
+        const userCredential = await signup(formData.email, formData.password);
+        const user = userCredential.user;
+        await axios.post('/api/users', {
+          firebase_uid: user.uid,
+          email: user.email
+        });
+
         setMessage('Signup successful!');
         navigate('/dashboard');
       }
@@ -60,7 +91,12 @@ const LoginSignup = () => {
     try {
       setMessage('');
       setLoading(true);
-      await googleSignIn();
+      const result = await googleSignIn();
+      const user = result.user;
+      await axios.post('/api/users', {
+        firebase_uid: user.uid,
+        email: user.email
+      });
       navigate('/dashboard');
     } catch (error) {
       console.error("Google Auth Error:", error);

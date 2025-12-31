@@ -7,6 +7,7 @@ import './Reports.css';
 const Reports = () => {
     const { currentUser } = useAuth();
     const [reportType, setReportType] = useState('daily');
+    const [fileFormat, setFileFormat] = useState('PDF');
     const [reports, setReports] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -29,24 +30,28 @@ const Reports = () => {
     const handleCreateReport = async () => {
         if (!currentUser) return;
         try {
-            // Logic to create a report
-            // For now, we'll create a dummy report based on the form 
-            // In a real app, this would probably trigger a backend job
             const newReport = {
                 firebase_uid: currentUser.uid,
                 name: `${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report`,
-                type: 'PDF', // Hardcoded for simplified example
-                status: 'Processing',
-                file_url: 'http://example.com/pending'
+                type: fileFormat,
+                email: currentUser.email
             };
 
             await axios.post('/api/reports', newReport);
-            alert("Report generation started!");
+            alert("Report generated successfully!");
             fetchReports(); // Refresh list
         } catch (error) {
             console.error("Error creating report:", error);
             alert("Failed to create report");
         }
+    };
+
+    const handleDownload = (url) => {
+        if (!url || url === '#') {
+            alert("File not available.");
+            return;
+        }
+        window.open(url, '_blank');
     };
 
     return (
@@ -61,12 +66,6 @@ const Reports = () => {
                             <h1 className="page-title">Air Quality Reports</h1>
                             <p className="page-subtitle">Generate and download detailed air quality analysis.</p>
                         </div>
-                        <button className="generate-btn">
-                            <svg fill="none" height="20" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M12 5v14M5 12h14"></path>
-                            </svg>
-                            Generate New Report
-                        </button>
                     </header>
 
                     <div className="reports-grid">
@@ -98,7 +97,7 @@ const Reports = () => {
                                                 <td><span className={`badge ${report.type.toLowerCase()}`}>{report.type}</span></td>
                                                 <td><span className={`status-dot ${report.status.toLowerCase()}`}></span> {report.status}</td>
                                                 <td>
-                                                    <button className="download-btn">
+                                                    <button className="download-btn" onClick={() => handleDownload(report.file_url)}>
                                                         Download
                                                     </button>
                                                 </td>
@@ -125,13 +124,13 @@ const Reports = () => {
                                     <label>Format</label>
                                     <div className="radio-group">
                                         <label className="radio-label">
-                                            <input type="radio" name="format" defaultChecked /> PDF
+                                            <input type="radio" name="format" value="PDF" checked={fileFormat === 'PDF'} onChange={(e) => setFileFormat(e.target.value)} /> PDF
                                         </label>
                                         <label className="radio-label">
-                                            <input type="radio" name="format" /> CSV
+                                            <input type="radio" name="format" value="CSV" checked={fileFormat === 'CSV'} onChange={(e) => setFileFormat(e.target.value)} /> CSV
                                         </label>
                                         <label className="radio-label">
-                                            <input type="radio" name="format" /> Excel
+                                            <input type="radio" name="format" value="DOCX" checked={fileFormat === 'DOCX'} onChange={(e) => setFileFormat(e.target.value)} /> Word
                                         </label>
                                     </div>
                                 </div>

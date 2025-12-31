@@ -1,22 +1,59 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 import Sidebar from './Sidebar';
 import './Dashboard.css';
 
+// Fix for default Leaflet icon issues (though we are using CircleMarker so might not need this, but good practice)
+import L from 'leaflet';
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
+  iconUrl: require('leaflet/dist/images/marker-icon.png'),
+  shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
+});
+
 const Dashboard = () => {
-  const [aqiData, setAqiData] = useState(null);
+  const [locations, setLocations] = useState([]);
+  const [latestReadings, setLatestReadings] = useState({});
+  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [weather, setWeather] = useState([]);
+  const [pollutionSources, setPollutionSources] = useState([]);
+  const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Initial Data Fetch (Locations + AQI)
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Assuming location_id=1 is "Delhi" or the default location for now
-        const response = await axios.get('/api/readings?location_id=1&limit=1');
-        if (response.data && response.data.length > 0) {
-          setAqiData(response.data[0]);
+        setLoading(true);
+        // 1. Fetch Locations
+        const locResponse = await axios.get('/api/locations');
+        const locs = locResponse.data;
+        setLocations(locs);
+
+        // 2. Fetch recent readings
+        const readingsResponse = await axios.get('/api/readings?limit=50');
+        const readings = readingsResponse.data;
+
+        // Process readings
+        const latest = {};
+        readings.forEach(r => {
+          if (!latest[r.location_id]) {
+            latest[r.location_id] = r;
+          }
+        });
+        setLatestReadings(latest);
+
+        // Set default selected location
+        if (locs.length > 0) {
+          const locWithData = locs.find(l => latest[l.id]);
+          setSelectedLocation(locWithData || locs[0]);
         }
+
       } catch (error) {
-        console.error("Error fetching AQI data:", error);
+        console.error("Error fetching dashboard data:", error);
       } finally {
         setLoading(false);
       }
@@ -25,8 +62,31 @@ const Dashboard = () => {
     fetchData();
   }, []);
 
-  // Helper to determine status based on AQI (simple logic for now)
+  // Fetch Location-Specific Data (Weather, Sources, Alerts) when selectedLocation changes
+  useEffect(() => {
+    if (!selectedLocation) return;
+
+    const fetchLocationDetails = async () => {
+      try {
+        const [weatherRes, sourcesRes, alertsRes] = await Promise.all([
+          axios.get(`/api/weather?location_id=${selectedLocation.id}`),
+          axios.get(`/api/pollution-sources?location_id=${selectedLocation.id}`),
+          axios.get(`/api/alerts?location_id=${selectedLocation.id}`)
+        ]);
+
+        setWeather(weatherRes.data);
+        setPollutionSources(sourcesRes.data);
+        setAlerts(alertsRes.data);
+      } catch (error) {
+        console.error("Error fetching location details:", error);
+      }
+    };
+
+    fetchLocationDetails();
+  }, [selectedLocation]);
+
   const getStatus = (aqi) => {
+    if (aqi === undefined || aqi === null) return 'No Data';
     if (aqi <= 50) return 'Good';
     if (aqi <= 100) return 'Moderate';
     if (aqi <= 150) return 'Unhealthy for Sensitive Groups';
@@ -38,6 +98,19 @@ const Dashboard = () => {
   const getStatusClass = (status) => {
     return status.toLowerCase().replace(/ /g, '-');
   };
+
+  const getColor = (aqi) => {
+    if (aqi === undefined || aqi === null) return '#gray';
+    if (aqi <= 50) return '#009966';
+    if (aqi <= 100) return '#ffde33';
+    if (aqi <= 150) return '#ff9933';
+    if (aqi <= 200) return '#cc0033';
+    if (aqi <= 300) return '#660099';
+    return '#7e0023';
+  };
+
+  const currentReading = selectedLocation ? latestReadings[selectedLocation.id] : null;
+  const currentAqi = currentReading ? currentReading.aqi : null;
 
   return (
     <div className="dashboard">
@@ -60,26 +133,70 @@ const Dashboard = () => {
               <div className="card">
                 <div className="aqi-metrics">
                   <div className="metric-box">
+                    <p className="metric-label">Location</p>
+                    <p className="metric-value location-name" style={{ fontSize: '1.2rem' }}>
+                      {selectedLocation ? selectedLocation.name : 'Loading...'}
+                    </p>
+                  </div>
+                  <div className="metric-box">
                     <p className="metric-label">Current AQI</p>
-                    <p className="metric-value primary">{loading ? '...' : (aqiData ? aqiData.aqi : '--')}</p>
-                    <p className={`metric-status ${loading ? '' : (aqiData ? getStatusClass(getStatus(aqiData.aqi)) : '')}`}>
-                      {loading ? 'Loading...' : (aqiData ? getStatus(aqiData.aqi) : 'No Data')}
+                    <p className="metric-value primary">{loading ? '...' : (currentAqi ?? '--')}</p>
+                    <p className={`metric-status ${loading ? '' : getStatusClass(getStatus(currentAqi))}`}>
+                      {loading ? 'Loading...' : getStatus(currentAqi)}
                     </p>
                   </div>
                   <div className="metric-box">
                     <p className="metric-label">Dominant Pollutant</p>
                     <p className="metric-value">PM2.5</p>
-                    <p className="metric-sub-value">{loading ? '' : (aqiData ? `${aqiData.pm2_5} µg/m³` : '')}</p>
+                    <p className="metric-sub-value">{loading ? '' : (currentReading ? `${currentReading.pm2_5} µg/m³` : '')}</p>
                   </div>
                 </div>
 
                 <h2 className="section-title">Regional AQI Heatmap</h2>
-                <div
-                  className="heatmap-image"
-                  style={{
-                    backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuA-uXR5NZgkHVygbzOfHHX1LCEoJe97ZTTMnl6YKJeE2f-0j8wVb1u7QnoxLBEGN-UA-epFFWhIpF6uXlg9T9IRGHAwJfMmt-DMNQkI7FI3fZP34ORTdDZ10jy8KAoHL3NBWJ7Ejr1JTol1yEcAysukWwo5JDoT7M3a5aDWUT_GhSaioy9QPqGoyQp6wsDr1Ll0YIyz_nD691UjLPY344S3GgalDNIqB_kuDrlYrTePmXEX_1tGX0hA_EtlB_CKRdO9NObsEv-2H2IU')`
-                  }}
-                ></div>
+                <div className="heatmap-container" style={{ height: '300px', width: '100%', borderRadius: '12px', overflow: 'hidden' }}>
+                  {locations.length > 0 ? (
+                    <MapContainer
+                      center={[28.6139, 77.2090]} // Center of Delhi
+                      zoom={10}
+                      style={{ height: '100%', width: '100%' }}
+                    >
+                      <TileLayer
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                      />
+                      {locations.map(loc => {
+                        const reading = latestReadings[loc.id];
+                        const aqi = reading ? reading.aqi : null;
+                        return (
+                          <CircleMarker
+                            key={loc.id}
+                            center={[loc.latitude, loc.longitude]}
+                            radius={10}
+                            pathOptions={{
+                              color: 'white',
+                              weight: 1,
+                              fillColor: getColor(aqi),
+                              fillOpacity: 0.8
+                            }}
+                            eventHandlers={{
+                              click: () => setSelectedLocation(loc),
+                            }}
+                          >
+                            <Popup>
+                              <strong>{loc.name}</strong><br />
+                              AQI: {aqi ?? 'N/A'}<br />
+                              Status: {getStatus(aqi)}
+                            </Popup>
+                          </CircleMarker>
+                        );
+                      })}
+                    </MapContainer>
+                  ) : (
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                      Loading Map...
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Weather Forecast */}
@@ -96,24 +213,18 @@ const Dashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      <tr>
-                        <td className="time-cell">10:00 AM</td>
-                        <td>28°C</td>
-                        <td>15 km/h</td>
-                        <td>60%</td>
-                      </tr>
-                      <tr>
-                        <td className="time-cell">12:00 PM</td>
-                        <td>30°C</td>
-                        <td>18 km/h</td>
-                        <td>55%</td>
-                      </tr>
-                      <tr>
-                        <td className="time-cell">2:00 PM</td>
-                        <td>32°C</td>
-                        <td>20 km/h</td>
-                        <td>50%</td>
-                      </tr>
+                      {weather.length > 0 ? (
+                        weather.map((w, index) => (
+                          <tr key={index}>
+                            <td className="time-cell">{w.time}</td>
+                            <td>{w.temp}</td>
+                            <td>{w.wind}</td>
+                            <td>{w.humidity}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr><td colSpan="4">No weather data available</td></tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -123,51 +234,43 @@ const Dashboard = () => {
             {/* Right Column */}
             <div className="right-column">
               {/* Top Pollution Sources */}
-              <div className="card">
+              <div className="card pollution-card">
                 <h2 className="section-title">Top Pollution Sources</h2>
                 <ul className="sources-list">
-                  <li className="source-item">
-                    <div className="source-icon">
-                      <svg fill="currentColor" height="24" viewBox="0 0 256 256" width="24" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M116,176a8,8,0,0,1-8,8H80a8,8,0,0,1,0-16h28A8,8,0,0,1,116,176Zm60-8H148a8,8,0,0,0,0,16h28a8,8,0,0,0,0-16Zm72,48a8,8,0,0,1-8,8H16a8,8,0,0,1,0-16H32V88a8,8,0,0,1,12.8-6.4L96,120V88a8,8,0,0,1,12.8-6.4l38.74,29.05L159.1,29.74A16.08,16.08,0,0,1,174.94,16h18.12A16.08,16.08,0,0,1,208.9,29.74l15,105.13s.08.78.08,1.13v72h16A8,8,0,0,1,248,216Zm-85.86-94.4,8.53,6.4h36.11L193.06,32H174.94ZM48,208H208V144H168a8,8,0,0,1-4.8-1.6l-14.4-10.8,0,0L112,104v32a8,8,0,0,1-12.8,6.4L48,104Z"></path>
-                      </svg>
-                    </div>
-                    <div className="source-info">
-                      <p className="source-name">Industrial Emissions</p>
-                      <p className="source-percentage">45%</p>
-                    </div>
-                  </li>
-                  <li className="source-item">
-                    <div className="source-icon">
-                      <svg fill="currentColor" height="24" viewBox="0 0 256 256" width="24" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M240,112H229.2L201.42,49.5A16,16,0,0,0,186.8,40H69.2a16,16,0,0,0-14.62,9.5L26.8,112H16a8,8,0,0,0,0,16h8v80a16,16,0,0,0,16,16H64a16,16,0,0,0,16-16V192h96v16a16,16,0,0,0,16,16h24a16,16,0,0,0,16-16V128h8a8,8,0,0,0,0-16ZM69.2,56H186.8l24.89,56H44.31ZM64,208H40V192H64Zm128,0V192h24v16Zm24-32H40V128H216ZM56,152a8,8,0,0,1,8-8H80a8,8,0,0,1,0,16H64A8,8,0,0,1,56,152Zm112,0a8,8,0,0,1,8-8h16a8,8,0,0,1,0,16H176A8,8,0,0,1,168,152Z"></path>
-                      </svg>
-                    </div>
-                    <div className="source-info">
-                      <p className="source-name">Vehicular Traffic</p>
-                      <p className="source-percentage">30%</p>
-                    </div>
-                  </li>
-                  <li className="source-item">
-                    <div className="source-icon">
-                      <svg fill="currentColor" height="24" viewBox="0 0 256 256" width="24" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M224,64H176V56a24,24,0,0,0-24-24H104A24,24,0,0,0,80,56v8H32A16,16,0,0,0,16,80V192a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V80A16,16,0,0,0,224,64ZM96,56a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96ZM224,80v32H192v-8a8,8,0,0,0-16,0v8H80v-8a8,8,0,0,0-16,0v8H32V80Zm0,112H32V128H64v8a8,8,0,0,0,16,0v-8h96v8a8,8,0,0,0,16,0v-8h32v64Z"></path>
-                      </svg>
-                    </div>
-                    <div className="source-info">
-                      <p className="source-name">Construction Dust</p>
-                      <p className="source-percentage">25%</p>
-                    </div>
-                  </li>
+                  {pollutionSources.length > 0 ? (
+                    pollutionSources.map((source, index) => (
+                      <li key={index} className="source-item">
+                        <div className="source-info" style={{ width: '100%' }}>
+                          <p className="source-name" style={{ fontSize: '1.1rem', marginBottom: '8px', fontWeight: '600' }}>{source.name}</p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ flex: 1, backgroundColor: '#f0f2f5', height: '10px', borderRadius: '5px', overflow: 'hidden' }}>
+                              <div style={{ width: `${source.percentage}%`, backgroundColor: '#4a90e2', height: '100%', borderRadius: '5px' }}></div>
+                            </div>
+                            <span className="source-percentage" style={{ fontWeight: 'bold', color: '#4a90e2', minWidth: '35px' }}>{source.percentage}%</span>
+                          </div>
+                        </div>
+                      </li>
+                    ))
+                  ) : (
+                    <p>No pollution source data available</p>
+                  )}
                 </ul>
               </div>
 
               {/* Alerts */}
-              <div className="card">
+              <div className="card alerts-card">
                 <h2 className="section-title">Alerts</h2>
-                <div className="alert-card">
-                  <p className="alert-title">High Pollution Alert</p>
-                  <p className="alert-message">Gurgaon AQI exceeds threshold. Advised to stay indoors.</p>
+                <div className="alerts-container">
+                  {alerts.length > 0 ? (
+                    alerts.map((alert, index) => (
+                      <div key={index} className={`alert-card ${alert.severity.toLowerCase()}`} style={{ marginBottom: '10px', padding: '10px', borderLeft: `4px solid ${alert.severity === 'High' ? 'red' : 'orange'}`, backgroundColor: '#fff5f5' }}>
+                        <p className="alert-title" style={{ fontWeight: 'bold', color: '#c00' }}>{alert.title}</p>
+                        <p className="alert-message">{alert.message}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p>No active alerts.</p>
+                  )}
                 </div>
               </div>
             </div>

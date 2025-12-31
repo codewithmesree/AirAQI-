@@ -86,3 +86,61 @@ class Report(db.Model):
             'status': self.status,
             'file_url': self.file_url
         }
+
+class WeatherForecast(db.Model):
+    __tablename__ = 'weather_forecasts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=False)
+    time = db.Column(db.String(50)) # e.g., "10:00 AM"
+    temp = db.Column(db.String(20)) # e.g., "28°C"
+    wind = db.Column(db.String(50)) # e.g., "15 km/h"
+    humidity = db.Column(db.String(20)) # e.g., "60%"
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'location_id': self.location_id,
+            'time': self.time,
+            'temp': self.temp,
+            'wind': self.wind,
+            'humidity': self.humidity
+        }
+
+class PollutionSource(db.Model):
+    __tablename__ = 'pollution_sources'
+
+    id = db.Column(db.Integer, primary_key=True)
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=False)
+    name = db.Column(db.String(255)) # e.g., "Industrial Emissions"
+    percentage = db.Column(db.Integer) # e.g., 45
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'location_id': self.location_id,
+            'name': self.name,
+            'percentage': self.percentage
+        }
+
+class Alert(db.Model):
+    __tablename__ = 'alerts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    location_id = db.Column(db.Integer, db.ForeignKey('locations.id'), nullable=False)
+    title = db.Column(db.String(255))
+    message = db.Column(db.Text)
+    severity = db.Column(db.String(50)) # High, Medium, Low
+    active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'location_id': self.location_id,
+            'title': self.title,
+            'message': self.message,
+            'severity': self.severity,
+            'active': self.active,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }

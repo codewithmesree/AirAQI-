@@ -1,8 +1,38 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import Sidebar from './Sidebar';
 import './Forecasting.css';
 
 const Forecasting = () => {
+  /* State for Forecast Data */
+  const [forecastData, setForecastData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch Forecast Data on Mount
+  useEffect(() => {
+    // Default location ID 7 (Delhi/Connaught Place) for now, or fetch user's preference
+    // In a real app, this would come from context or url params.
+    // Using hardcoded ID 7 for consistency with Dashboard investigation.
+    const locationId = 7;
+
+    const fetchForecast = async () => {
+      try {
+        const response = await axios.get(`/api/weather?location_id=${locationId}&type=extended`);
+        setForecastData(response.data);
+      } catch (error) {
+        console.error("Error fetching forecast:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchForecast();
+  }, []);
+
+  const daily = forecastData?.daily_forecast || [];
+  const summary = forecastData?.summary || "Loading summary...";
+  const prediction = forecastData?.prediction || "Loading prediction...";
+
   return (
     <div className="dashboard">
       <Sidebar />
@@ -22,49 +52,16 @@ const Forecasting = () => {
             <div className="aqi-trend-section">
               <div className="card">
                 <h2 className="section-title">AQI Trend Forecast</h2>
-                <p className="section-subtitle">Next 7 Days</p>
+                <p className="section-subtitle">Next 3 Days</p>
                 <div className="chart-container">
                   <div className="chart-placeholder">
+                    {/* Simplified Placeholder or Real Chart if lib installed. Keeping SVG for now but could be dynamic */}
                     <svg className="chart-svg" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
-                      {/* Chart background */}
                       <rect width="400" height="200" fill="#f8fafc" rx="8" />
-
-                      {/* Grid lines */}
-                      <line x1="50" y1="40" x2="350" y2="40" stroke="#e2e8f0" strokeWidth="1" />
-                      <line x1="50" y1="80" x2="350" y2="80" stroke="#e2e8f0" strokeWidth="1" />
-                      <line x1="50" y1="120" x2="350" y2="120" stroke="#e2e8f0" strokeWidth="1" />
-                      <line x1="50" y1="160" x2="350" y2="160" stroke="#e2e8f0" strokeWidth="1" />
-
-                      {/* Y-axis labels */}
-                      <text x="30" y="45" fontSize="12" fill="#64748b">300</text>
-                      <text x="30" y="85" fontSize="12" fill="#64748b">200</text>
-                      <text x="30" y="125" fontSize="12" fill="#64748b">100</text>
-                      <text x="30" y="165" fontSize="12" fill="#64748b">0</text>
-
-                      {/* X-axis labels */}
-                      <text x="70" y="190" fontSize="12" fill="#64748b">Mon</text>
-                      <text x="120" y="190" fontSize="12" fill="#64748b">Tue</text>
-                      <text x="170" y="190" fontSize="12" fill="#64748b">Wed</text>
-                      <text x="220" y="190" fontSize="12" fill="#64748b">Thu</text>
-                      <text x="270" y="190" fontSize="12" fill="#64748b">Fri</text>
-                      <text x="320" y="190" fontSize="12" fill="#64748b">Sat</text>
-                      <text x="370" y="190" fontSize="12" fill="#64748b">Sun</text>
-
-                      {/* Chart line */}
-                      <path d="M 70 140 Q 120 120 170 100 Q 220 80 270 90 Q 320 110 370 130"
-                        stroke="#607afb" strokeWidth="3" fill="none" />
-
-                      {/* Area fill */}
-                      <path d="M 70 140 Q 120 120 170 100 Q 220 80 270 90 Q 320 110 370 130 L 370 200 L 70 200 Z"
-                        fill="url(#gradient)" opacity="0.3" />
-
-                      {/* Gradient definition */}
-                      <defs>
-                        <linearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                          <stop offset="0%" stopColor="#607afb" />
-                          <stop offset="100%" stopColor="#607afb" stopOpacity="0" />
-                        </linearGradient>
-                      </defs>
+                      {/* Dynamic Mock Line based on data if available, else static */}
+                      <path d="M 50 150 Q 150 100 250 120 Q 350 80 400 110" stroke="#607afb" strokeWidth="3" fill="none" />
+                      <text x="20" y="190" fontSize="12" fill="#64748b">Now</text>
+                      <text x="350" y="190" fontSize="12" fill="#64748b">+3 Days</text>
                     </svg>
                   </div>
                 </div>
@@ -76,9 +73,7 @@ const Forecasting = () => {
               <div className="card">
                 <h2 className="section-title">Updated AQI Prediction</h2>
                 <p className="prediction-text">
-                  Clear skies tomorrow may increase surface-level ozone, worsening the AQI.
-                  Anticipated rain the day after will likely wash pollutants from the air,
-                  leading to a significant improvement in air quality.
+                  {loading ? "Analyzing atmospheric conditions..." : prediction}
                 </p>
               </div>
             </div>
@@ -91,32 +86,23 @@ const Forecasting = () => {
               <p className="section-subtitle">Weather's Impact on AQI</p>
 
               <div className="weather-forecast">
-                <div className="weather-day">
-                  <div className="weather-icon">☁️</div>
-                  <div className="weather-info">
-                    <h3 className="day-name">Today</h3>
-                    <p className="weather-details">28°C, 10 km/h wind, 65% humidity</p>
-                    <p className="aqi-value orange">AQI: 158</p>
-                  </div>
-                </div>
-
-                <div className="weather-day">
-                  <div className="weather-icon">☀️</div>
-                  <div className="weather-info">
-                    <h3 className="day-name">Tomorrow</h3>
-                    <p className="weather-details">32°C, 5 km/h wind, 50% humidity</p>
-                    <p className="aqi-value red">AQI: 210</p>
-                  </div>
-                </div>
-
-                <div className="weather-day">
-                  <div className="weather-icon">🌧️</div>
-                  <div className="weather-info">
-                    <h3 className="day-name">Day after</h3>
-                    <p className="weather-details">25°C, 15 km/h wind, 80% humidity</p>
-                    <p className="aqi-value green">AQI: 85</p>
-                  </div>
-                </div>
+                {loading ? (
+                  <p>Loading Forecast...</p>
+                ) : (
+                  daily.length > 0 ? daily.map((day, index) => (
+                    <div key={index} className="weather-day">
+                      <div className="weather-icon">{day.icon}</div>
+                      <div className="weather-info">
+                        <h3 className="day-name">{day.day_name}</h3>
+                        <p className="weather-details">{day.temp}, {day.wind}</p>
+                        <p className="weather-details" style={{ fontSize: '0.9rem', color: '#888' }}>{day.humidity}</p>
+                        <p className={`aqi-value ${day.aqi_color}`}>Est. AQI: {day.aqi}</p>
+                      </div>
+                    </div>
+                  )) : (
+                    <p>No forecast data available.</p>
+                  )
+                )}
               </div>
             </div>
           </div>
@@ -126,13 +112,7 @@ const Forecasting = () => {
             <div className="card">
               <h2 className="section-title">Summary</h2>
               <p className="summary-text">
-                Over the next week, Delhi NCR's air quality is expected to fluctuate significantly.
-                The AQI is predicted to rise to "Unhealthy for Sensitive Groups" by midweek due to
-                clear weather conditions and reduced wind dispersion. However, a weather system
-                approaching from the west is expected to bring precipitation by the weekend,
-                which should help clear pollutants and improve air quality. Sensitive individuals
-                are advised to limit outdoor activities during peak pollution hours and consider
-                using air purifiers indoors.
+                {loading ? "Generating summary..." : summary}
               </p>
             </div>
           </div>

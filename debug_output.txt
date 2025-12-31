@@ -1,0 +1,20 @@
+Checking database connection and schema...
+Locations count: 20
+Querying PollutionSource...
+PollutionSource Error: (psycopg2.errors.UndefinedTable) relation "pollution_sources" does not exist
+LINE 2: FROM pollution_sources 
+             ^
+
+[SQL: SELECT pollution_sources.id AS pollution_sources_id, pollution_sources.location_id AS pollution_sources_location_id, pollution_sources.name AS pollution_sources_name, pollution_sources.percentage AS pollution_sources_percentage 
+FROM pollution_sources 
+ LIMIT %(param_1)s]
+[parameters: {'param_1': 1}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+Querying Alert...
+Alert Error: (psycopg2.errors.InFailedSqlTransaction) current transaction is aborted, commands ignored until end of transaction block
+
+[SQL: SELECT alerts.id AS alerts_id, alerts.location_id AS alerts_location_id, alerts.title AS alerts_title, alerts.message AS alerts_message, alerts.severity AS alerts_severity, alerts.active AS alerts_active, alerts.created_at AS alerts_created_at 
+FROM alerts 
+ LIMIT %(param_1)s]
+[parameters: {'param_1': 1}]
+(Background on this error at: https://sqlalche.me/e/20/2j85)
